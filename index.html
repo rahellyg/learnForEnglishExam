@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>משחק מילים לאנגלית</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'Heebo', 'Segoe UI', Arial, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #0e7490 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  h1 { font-size: clamp(1.5rem, 4vw, 2.4rem); font-weight: 800; text-shadow: 0 2px 12px rgba(0,0,0,.4); }
+  .subtitle { opacity: .8; margin-top: 4px; font-size: .95rem; }
+
+  .screen { width: 100%; max-width: 640px; display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 24px; }
+  .hidden { display: none !important; }
+
+  /* ---------- menu ---------- */
+  .menu-btn {
+    width: 100%; padding: 18px 22px; border: none; border-radius: 16px;
+    background: rgba(255,255,255,.10); backdrop-filter: blur(6px);
+    color: #fff; font-family: inherit; font-size: 1.15rem; font-weight: 600;
+    cursor: pointer; text-align: right; display: flex; align-items: center; gap: 14px;
+    border: 1px solid rgba(255,255,255,.15); transition: transform .15s, background .15s;
+  }
+  .menu-btn:hover { background: rgba(255,255,255,.22); transform: translateY(-2px); }
+  .menu-btn .icon { font-size: 1.7rem; }
+  .menu-btn small { display: block; font-weight: 400; opacity: .75; font-size: .85rem; }
+  .best { margin-right: auto; font-size: .8rem; opacity: .8; background: rgba(0,0,0,.25); padding: 3px 10px; border-radius: 999px; }
+
+  /* ---------- HUD ---------- */
+  .hud { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pill { background: rgba(0,0,0,.3); padding: 6px 14px; border-radius: 999px; font-size: .9rem; font-weight: 600; }
+  .pill.streak.hot { background: linear-gradient(90deg,#f59e0b,#ef4444); }
+  .back-btn { background: rgba(255,255,255,.12); border: none; color: #fff; border-radius: 10px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: .9rem; }
+  .back-btn:hover { background: rgba(255,255,255,.25); }
+  .progress { width: 100%; height: 8px; background: rgba(255,255,255,.15); border-radius: 999px; overflow: hidden; }
+  .progress > div { height: 100%; background: linear-gradient(90deg,#34d399,#22d3ee); width: 0; transition: width .3s; }
+
+  /* ---------- card ---------- */
+  .card {
+    width: 100%; background: #fff; color: #1e293b; border-radius: 22px;
+    padding: 34px 24px; box-shadow: 0 18px 45px rgba(0,0,0,.35);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    min-height: 210px; justify-content: center;
+  }
+  .word-en { font-size: clamp(1.8rem, 6vw, 2.6rem); font-weight: 800; direction: ltr; letter-spacing: .5px; }
+  .word-he { font-size: 1.4rem; color: #475569; }
+  .hint { font-size: .85rem; color: #94a3b8; }
+
+  /* flashcard flip */
+  .flip-wrap { width: 100%; perspective: 1000px; cursor: pointer; }
+  .flip-inner { position: relative; width: 100%; min-height: 240px; transition: transform .5s; transform-style: preserve-3d; }
+  .flip-inner.flipped { transform: rotateY(180deg); }
+  .face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 30px 20px; box-shadow: 0 18px 45px rgba(0,0,0,.35); }
+  .face.front { background: #fff; color: #1e293b; }
+  .face.back { background: linear-gradient(135deg,#059669,#0d9488); color: #fff; transform: rotateY(180deg); }
+  .face.back .word-he { color: #d1fae5; font-size: 1.8rem; font-weight: 700; }
+
+  .speak-btn { background: #eef2ff; border: none; border-radius: 50%; width: 46px; height: 46px; font-size: 1.3rem; cursor: pointer; transition: transform .15s; }
+  .speak-btn:hover { transform: scale(1.12); }
+
+  /* ---------- buttons ---------- */
+  .btn-row { display: flex; gap: 12px; width: 100%; }
+  .action-btn {
+    flex: 1; padding: 15px; border: none; border-radius: 14px; font-family: inherit;
+    font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: transform .12s, filter .12s; color: #fff;
+  }
+  .action-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+  .know { background: linear-gradient(135deg,#10b981,#059669); }
+  .dontknow { background: linear-gradient(135deg,#ef4444,#dc2626); }
+
+  .options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+  .opt {
+    padding: 18px 14px; border-radius: 14px; border: 2px solid rgba(255,255,255,.2);
+    background: rgba(255,255,255,.1); color: #fff; font-family: inherit;
+    font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all .15s; min-height: 64px;
+  }
+  .opt:hover:not(:disabled) { background: rgba(255,255,255,.25); transform: translateY(-2px); }
+  .opt.correct { background: #10b981 !important; border-color: #6ee7b7; animation: pop .35s; }
+  .opt.wrong { background: #ef4444 !important; border-color: #fca5a5; animation: shake .35s; }
+  .opt.ltr { direction: ltr; }
+  @keyframes pop { 50% { transform: scale(1.06); } }
+  @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+  /* typing */
+  .type-input {
+    width: 100%; padding: 16px 18px; border-radius: 14px; border: 3px solid rgba(255,255,255,.25);
+    background: rgba(255,255,255,.12); color: #fff; font-size: 1.3rem; font-family: inherit;
+    direction: ltr; text-align: center; outline: none;
+  }
+  .type-input:focus { border-color: #22d3ee; }
+  .type-input::placeholder { color: rgba(255,255,255,.45); }
+  .feedback { min-height: 30px; font-weight: 700; font-size: 1.05rem; }
+  .feedback.good { color: #6ee7b7; }
+  .feedback.bad { color: #fca5a5; }
+
+  /* letter bank */
+  .letter-slots { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; direction: ltr; min-height: 58px; }
+  .slot {
+    width: 46px; height: 54px; border-radius: 12px; border: 2px dashed rgba(255,255,255,.4);
+    background: rgba(255,255,255,.08); color: #fff; font-family: inherit;
+    font-size: 1.5rem; font-weight: 800; cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; justify-content: center; text-transform: lowercase;
+  }
+  .slot.filled { border-style: solid; border-color: #22d3ee; background: rgba(34,211,238,.18); }
+  .slot.filled:hover { background: rgba(34,211,238,.32); }
+  .slot.space-slot { border-color: transparent; background: transparent; cursor: default; font-size: 1.1rem; }
+  .letter-bank { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; direction: ltr; }
+  .bank-letter {
+    width: 46px; height: 54px; border-radius: 12px; border: none; cursor: pointer;
+    background: linear-gradient(135deg,#6366f1,#4f46e5); color: #fff; font-family: inherit;
+    font-size: 1.5rem; font-weight: 800; transition: all .15s; box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  }
+  .bank-letter:hover:not(:disabled) { transform: translateY(-3px); filter: brightness(1.15); }
+  .bank-letter:disabled { opacity: .18; cursor: default; box-shadow: none; }
+  .letter-slots.good .slot.filled { border-color: #34d399; background: rgba(16,185,129,.3); animation: pop .35s; }
+  .letter-slots.bad .slot.filled { border-color: #f87171; background: rgba(239,68,68,.3); animation: shake .35s; }
+
+  /* matching */
+  .match-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; }
+  @media (max-width: 480px) { .match-grid { grid-template-columns: repeat(3, 1fr); } }
+  .match-card {
+    aspect-ratio: 1; border-radius: 14px; border: none; cursor: pointer;
+    background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.2);
+    color: #fff; font-family: inherit; font-weight: 700; font-size: .95rem;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    padding: 6px; transition: all .2s; word-break: break-word;
+  }
+  .match-card:hover:not(:disabled) { background: rgba(255,255,255,.28); }
+  .match-card.en { direction: ltr; }
+  .match-card.selected { background: #6366f1; border-color: #a5b4fc; transform: scale(1.05); }
+  .match-card.matched { background: #10b981; border-color: #6ee7b7; opacity: .55; cursor: default; }
+  .match-card.error { background: #ef4444; animation: shake .3s; }
+
+  /* results */
+  .result-card { text-align: center; }
+  .big-score { font-size: 3.2rem; font-weight: 800; background: linear-gradient(90deg,#f59e0b,#22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stat-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+  .stat-box { background: #f1f5f9; border-radius: 12px; padding: 10px 18px; }
+  .stat-box b { display: block; font-size: 1.3rem; color: #0f172a; }
+  .stat-box span { font-size: .8rem; color: #64748b; }
+  .mistakes-list { width: 100%; text-align: right; background: #f8fafc; border-radius: 12px; padding: 12px 16px; max-height: 220px; overflow-y: auto; }
+  .mistakes-list h3 { font-size: 1rem; color: #334155; margin-bottom: 8px; }
+  .mistakes-list .m-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; color: #475569; font-size: .95rem; }
+  .mistakes-list .m-row b { direction: ltr; color: #0f172a; }
+
+  .word-table { width: 100%; background: #fff; color: #1e293b; border-radius: 18px; overflow: hidden; box-shadow: 0 18px 45px rgba(0,0,0,.35); }
+  .word-table table { width: 100%; border-collapse: collapse; }
+  .word-table th { background: #4f46e5; color: #fff; padding: 12px; font-size: 1rem; }
+  .word-table td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; font-size: 1rem; }
+  .word-table tr:nth-child(even) { background: #f8fafc; }
+  .word-table td.en { direction: ltr; text-align: left; font-weight: 700; }
+  .word-table .num { color: #94a3b8; font-size: .8rem; width: 30px; }
+</style>
+</head>
+<body>
+
+<h1>🎓 משחק מילים</h1>
+<div class="subtitle">26 מילים</div>
+
+<!-- ================= MENU ================= -->
+<div id="menu" class="screen">
+  <button class="menu-btn" onclick="startMode('flash')">
+    <span class="icon">🃏</span>
+    <span>כרטיסיות לימוד<small>לחצו על הכרטיס כדי לראות את התרגום</small></span>
+  </button>
+  <button class="menu-btn" onclick="startMode('quiz')">
+    <span class="icon">❓</span>
+    <span>מבחן אמריקאי<small>בחרו את התשובה הנכונה מ-4 אפשרויות</small></span>
+    <span class="best" id="best-quiz"></span>
+  </button>
+  <button class="menu-btn" onclick="startMode('write')">
+    <span class="icon">🔤</span>
+    <span>בנק אותיות<small>השלימו את המילה באנגלית מתוך בנק האותיות</small></span>
+    <span class="best" id="best-write"></span>
+  </button>
+  <button class="menu-btn" onclick="startMode('match')">
+    <span class="icon">🧩</span>
+    <span>משחק התאמות<small>התאימו כל מילה באנגלית לתרגום שלה</small></span>
+    <span class="best" id="best-match"></span>
+  </button>
+  <button class="menu-btn" onclick="startMode('sentence')">
+    <span class="icon">📝</span>
+    <span>השלמת משפטים<small>בחרו את המילה החסרה במשפט</small></span>
+    <span class="best" id="best-sentence"></span>
+  </button>
+  <button class="menu-btn" onclick="showScreen('words'); renderWordTable();">
+    <span class="icon">📖</span>
+    <span>רשימת המילים המלאה<small>כל 26 המילים לבחינה</small></span>
+  </button>
+</div>
+
+<!-- ================= HUD ================= -->
+<div id="game-area" class="screen hidden">
+  <div class="hud">
+    <button class="back-btn" onclick="endToMenu()">⬅ תפריט</button>
+    <div class="pill" id="hud-progress">1 / 26</div>
+    <div class="pill">⭐ <span id="hud-score">0</span></div>
+    <div class="pill streak" id="hud-streak">🔥 0</div>
+  </div>
+  <div class="progress"><div id="progress-bar"></div></div>
+
+  <!-- flashcards -->
+  <div id="mode-flash" class="screen hidden" style="margin-top:0">
+    <div class="flip-wrap" onclick="flipCard()">
+      <div class="flip-inner" id="flip-inner">
+        <div class="face front">
+          <div class="word-en" id="flash-en"></div>
+          <button class="speak-btn" onclick="event.stopPropagation(); speak(currentWord.en)">🔊</button>
+          <div class="hint">לחצו לראות תרגום 👆</div>
+        </div>
+        <div class="face back">
+          <div class="word-en" id="flash-en-back"></div>
+          <div class="word-he" id="flash-he"></div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="action-btn dontknow" onclick="flashAnswer(false)">❌ עוד לא</button>
+      <button class="action-btn know" onclick="flashAnswer(true)">✅ יודע/ת</button>
+    </div>
+  </div>
+
+  <!-- quiz -->
+  <div id="mode-quiz" class="screen hidden" style="margin-top:0">
+    <div class="card">
+      <div class="hint" id="quiz-q-label"></div>
+      <div id="quiz-question" style="font-size:2rem;font-weight:800"></div>
+      <button class="speak-btn hidden" id="quiz-speak" onclick="speak(currentWord.en)">🔊</button>
+    </div>
+    <div class="options" id="quiz-options"></div>
+  </div>
+
+  <!-- write (letter bank) -->
+  <div id="mode-write" class="screen hidden" style="margin-top:0">
+    <div class="card">
+      <div class="hint">השלימו את המילה באנגלית:</div>
+      <div class="word-he" id="write-he" style="font-size:1.8rem;font-weight:700;color:#0f172a"></div>
+      <button class="speak-btn" onclick="speak(currentWord.en)">🔊</button>
+    </div>
+    <div class="letter-slots" id="letter-slots"></div>
+    <div class="letter-bank" id="letter-bank"></div>
+    <div class="feedback" id="write-feedback"></div>
+    <div class="btn-row">
+      <button class="action-btn dontknow" onclick="resetLetters()">🔄 איפוס</button>
+      <button class="action-btn know" onclick="checkWrite()">בדיקה ✔</button>
+    </div>
+  </div>
+
+  <!-- match -->
+  <div id="mode-match" class="screen hidden" style="margin-top:0">
+    <div class="match-grid" id="match-grid"></div>
+  </div>
+
+  <!-- sentence completion -->
+  <div id="mode-sentence" class="screen hidden" style="margin-top:0">
+    <div class="card">
+      <div class="hint">מהי המילה החסרה?</div>
+      <div id="sentence-text" style="font-size:1.5rem;font-weight:800;direction:ltr;color:#0f172a"></div>
+      <div class="word-he" id="sentence-he" style="font-size:1rem"></div>
+    </div>
+    <div class="options" id="sentence-options"></div>
+  </div>
+
+  <!-- results -->
+  <div id="mode-result" class="screen hidden" style="margin-top:0">
+    <div class="card result-card">
+      <div class="big-score" id="result-score"></div>
+      <div id="result-msg" style="color:#475569;font-weight:600"></div>
+      <div class="stat-row">
+        <div class="stat-box"><b id="result-correct" style="color:#059669"></b><span>נכונות</span></div>
+        <div class="stat-box"><b id="result-wrong" style="color:#dc2626"></b><span>טעויות</span></div>
+        <div class="stat-box"><b id="result-streak" style="color:#d97706"></b><span>רצף שיא</span></div>
+      </div>
+      <div class="mistakes-list hidden" id="mistakes-box">
+        <h3>📝 מילים לחזור עליהן:</h3>
+        <div id="mistakes-list"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="action-btn dontknow" onclick="endToMenu()">🏠 תפריט</button>
+      <button class="action-btn know" onclick="startMode(currentMode)">🔄 שחקו שוב</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= WORD LIST ================= -->
+<div id="words" class="screen hidden">
+  <div class="hud">
+    <button class="back-btn" onclick="endToMenu()">⬅ תפריט</button>
+    <div class="pill">📖 26 מילים</div>
+  </div>
+  <div class="word-table">
+    <table>
+      <thead><tr><th>#</th><th style="text-align:left">English</th><th>עברית</th></tr></thead>
+      <tbody id="word-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+/* ================= DATA ================= */
+const WORDS = [
+  { en: "about",     he: "בערך" },
+  { en: "afraid",    he: "פוחד" },
+  { en: "anything",  he: "כל דבר, שום דבר" },
+  { en: "clever",    he: "חכם" },
+  { en: "dear",      he: "יקר" },
+  { en: "decide",    he: "להחליט" },
+  { en: "famous",    he: "מפורסם" },
+  { en: "glad",      he: "שמח" },
+  { en: "hit",       he: "להכות" },
+  { en: "island",    he: "אי" },
+  { en: "leave",     he: "להשאיר" },
+  { en: "love",      he: "לאהוב" },
+  { en: "million",   he: "מיליון" },
+  { en: "mountain",  he: "הר" },
+  { en: "nature",    he: "טבע" },
+  { en: "order",     he: "להזמין" },
+  { en: "pick",      he: "לבחור" },
+  { en: "popular",   he: "פופולרי" },
+  { en: "reason",    he: "סיבה" },
+  { en: "return",    he: "לחזור" },
+  { en: "saw",       he: "ראה" },
+  { en: "several",   he: "כמה, אחדים" },
+  { en: "still",     he: "עדיין" },
+  { en: "team",      he: "קבוצה" },
+  { en: "the cold",  he: "הקור" },
+  { en: "thousand",  he: "אלף" }
+];
+
+/* Easy practice sentences — the blank is always one of the WORDS */
+const SENTENCES = [
+  { en: "The book is ___ animals.",        word: "about",     he: "הספר עוסק בחיות." },
+  { en: "The little boy is ___ of dogs.",  word: "afraid",    he: "הילד הקטן פוחד מכלבים." },
+  { en: "I don't have ___ to eat.",        word: "anything",  he: "אין לי שום דבר לאכול." },
+  { en: "The fox is a ___ animal.",        word: "clever",    he: "השועל הוא חיה חכמה." },
+  { en: "___ Mom, I love you!",            word: "dear",      he: "אמא יקרה, אני אוהב אותך!" },
+  { en: "We ___ to go to the park.",       word: "decide",    he: "אנחנו מחליטים ללכת לפארק." },
+  { en: "The singer is very ___.",         word: "famous",    he: "הזמר מפורסם מאוד." },
+  { en: "I am ___ to see you.",            word: "glad",      he: "אני שמח לראות אותך." },
+  { en: "Don't ___ the ball so hard!",     word: "hit",       he: "אל תכה את הכדור כל כך חזק!" },
+  { en: "They live on a small ___.",       word: "island",    he: "הם גרים על אי קטן." },
+  { en: "Please ___ the door open.",       word: "leave",     he: "בבקשה השאירו את הדלת פתוחה." },
+  { en: "I ___ my family.",                word: "love",      he: "אני אוהב את המשפחה שלי." },
+  { en: "A ___ people live in the city.",  word: "million",   he: "מיליון אנשים גרים בעיר." },
+  { en: "The ___ is very high.",           word: "mountain",  he: "ההר גבוה מאוד." },
+  { en: "We love to walk in ___.",         word: "nature",    he: "אנחנו אוהבים לטייל בטבע." },
+  { en: "Can I ___ a pizza, please?",      word: "order",     he: "אפשר להזמין פיצה, בבקשה?" },
+  { en: "___ a card, any card!",           word: "pick",      he: "בחר קלף, איזה קלף שתרצה!" },
+  { en: "Football is a ___ game.",         word: "popular",   he: "כדורגל הוא משחק פופולרי." },
+  { en: "What is the ___ for this?",       word: "reason",    he: "מה הסיבה לזה?" },
+  { en: "I will ___ home at five.",        word: "return",    he: "אחזור הביתה בחמש." },
+  { en: "She ___ a bird in the tree.",     word: "saw",       he: "היא ראתה ציפור על העץ." },
+  { en: "There are ___ apples here.",      word: "several",   he: "יש כמה תפוחים כאן." },
+  { en: "It is ___ raining outside.",      word: "still",     he: "עדיין יורד גשם בחוץ." },
+  { en: "Our ___ won the game!",           word: "team",      he: "הקבוצה שלנו ניצחה במשחק!" },
+  { en: "I don't like ___.",               word: "the cold",  he: "אני לא אוהב את הקור." },
+  { en: "A ___ people came to the show.",  word: "thousand",  he: "אלף אנשים באו למופע." }
+];
+
+const MATCH_PAIRS = 6; // cards per match board; rounds continue until all words are covered
+
+/* ================= STATE ================= */
+let currentMode = null;
+let deck = [], deckIndex = 0;
+let score = 0, streak = 0, bestStreak = 0, correctCount = 0, wrongCount = 0;
+let mistakes = [];
+let currentWord = null;
+let quizDirection = 'en2he';
+let locked = false;
+let lastQuizAnswerPos = -1;
+
+/* match state */
+let matchSelected = null;
+let matchSolved = 0;
+let matchSolvedTotal = 0;
+let matchRoundWords = [];
+let matchPool = [];
+
+/* ================= HELPERS ================= */
+const $ = id => document.getElementById(id);
+const shuffle = arr => arr.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(p => p[1]);
+const sample = (arr, n, exclude) => shuffle(arr.filter(w => w !== exclude)).slice(0, n);
+
+function speak(text) {
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.rate = 0.85;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function showScreen(name) {
+  ['menu', 'game-area', 'words'].forEach(s => $(s).classList.add('hidden'));
+  $(name).classList.remove('hidden');
+  if (name === 'menu') renderBest();
+}
+
+function showMode(name) {
+  ['mode-flash', 'mode-quiz', 'mode-write', 'mode-match', 'mode-sentence', 'mode-result'].forEach(m => $(m).classList.add('hidden'));
+  if (name) $(name).classList.remove('hidden');
+}
+
+function updateHUD() {
+  $('hud-score').textContent = score;
+  $('hud-streak').textContent = '🔥 ' + streak;
+  $('hud-streak').classList.toggle('hot', streak >= 5);
+  const total = currentMode === 'match' ? WORDS.length : deck.length;
+  $('hud-progress').textContent = Math.min(deckIndex + 1, total) + ' / ' + total;
+  $('progress-bar').style.width = (deckIndex / total * 100) + '%';
+}
+
+function addScore(ok) {
+  if (ok) {
+    correctCount++;
+    streak++;
+    bestStreak = Math.max(bestStreak, streak);
+    score += 10 + Math.min(streak - 1, 5) * 2; // streak bonus
+  } else {
+    wrongCount++;
+    streak = 0;
+    if (currentWord && !mistakes.some(m => m.en === currentWord.en)) mistakes.push(currentWord);
+  }
+  updateHUD();
+}
+
+function renderBest() {
+  const b = JSON.parse(localStorage.getItem('wordGameBest') || '{}');
+  $('best-quiz').textContent     = b.quiz     ? '🏆 ' + b.quiz     : '';
+  $('best-write').textContent    = b.write    ? '🏆 ' + b.write    : '';
+  $('best-match').textContent    = b.match    ? '🏆 ' + b.match    : '';
+  $('best-sentence').textContent = b.sentence ? '🏆 ' + b.sentence : '';
+}
+
+function saveBest(mode, val) {
+  const b = JSON.parse(localStorage.getItem('wordGameBest') || '{}');
+  if (!b[mode] || val > b[mode]) { b[mode] = val; localStorage.setItem('wordGameBest', JSON.stringify(b)); }
+}
+
+/* ================= GAME FLOW ================= */
+function startMode(mode) {
+  currentMode = mode;
+  deck = shuffle(mode === 'sentence' ? SENTENCES : WORDS);
+  deckIndex = 0; score = 0; streak = 0; bestStreak = 0;
+  correctCount = 0; wrongCount = 0; mistakes = []; locked = false;
+  showScreen('game-area');
+  if (mode === 'flash')    { showMode('mode-flash');    nextFlash(); }
+  if (mode === 'quiz')     { showMode('mode-quiz');     nextQuiz(); }
+  if (mode === 'write')    { showMode('mode-write');    nextWrite(); }
+  if (mode === 'match')    { showMode('mode-match');    matchPool = shuffle(WORDS); matchSolvedTotal = 0; startMatchRound(); }
+  if (mode === 'sentence') { showMode('mode-sentence'); nextSentence(); }
+  updateHUD();
+}
+
+function endToMenu() {
+  showMode(null);
+  showScreen('menu');
+}
+
+function finishGame() {
+  showMode('mode-result');
+  $('progress-bar').style.width = '100%';
+  $('result-score').textContent = score + ' נק׳';
+  $('result-correct').textContent = correctCount;
+  $('result-wrong').textContent = wrongCount;
+  $('result-streak').textContent = bestStreak;
+  const pct = correctCount / Math.max(1, correctCount + wrongCount);
+  $('result-msg').textContent =
+    pct === 1 ? 'מושלם! 🏆 אלופים!' :
+    pct >= 0.8 ? 'כל הכבוד! 🌟 כמעט מושלם' :
+    pct >= 0.6 ? 'יפה מאוד! 💪 עוד קצת תרגול' :
+                 'לא נורא 🙂 חזרו על הכרטיסיות ונסו שוב';
+  const box = $('mistakes-box');
+  if (mistakes.length) {
+    box.classList.remove('hidden');
+    $('mistakes-list').innerHTML = mistakes.map(m =>
+      `<div class="m-row"><b>${m.en}</b><span>${m.he}</span></div>`).join('');
+  } else box.classList.add('hidden');
+  if (currentMode !== 'flash') saveBest(currentMode, score);
+}
+
+function advance() {
+  deckIndex++;
+  if (deckIndex >= deck.length) return finishGame();
+  if (currentMode === 'flash')    nextFlash();
+  if (currentMode === 'quiz')     nextQuiz();
+  if (currentMode === 'write')    nextWrite();
+  if (currentMode === 'sentence') nextSentence();
+  updateHUD();
+}
+
+/* ================= FLASHCARDS ================= */
+function nextFlash() {
+  currentWord = deck[deckIndex];
+  $('flip-inner').classList.remove('flipped');
+  setTimeout(() => {
+    $('flash-en').textContent = currentWord.en;
+    $('flash-en-back').textContent = currentWord.en;
+    $('flash-he').textContent = currentWord.he;
+  }, $('flip-inner').classList.contains('flipped') ? 250 : 0);
+  updateHUD();
+}
+function flipCard() { $('flip-inner').classList.toggle('flipped'); }
+function flashAnswer(known) {
+  addScore(known);
+  advance();
+}
+
+/* ================= QUIZ ================= */
+function nextQuiz() {
+  currentWord = deck[deckIndex];
+  locked = false;
+  quizDirection = Math.random() < 0.5 ? 'en2he' : 'he2en';
+  const isEn2He = quizDirection === 'en2he';
+
+  $('quiz-q-label').textContent = isEn2He ? 'מה התרגום של:' : 'איזו מילה באנגלית מתאימה ל:';
+  $('quiz-question').textContent = isEn2He ? currentWord.en : currentWord.he;
+  $('quiz-question').style.direction = isEn2He ? 'ltr' : 'rtl';
+  $('quiz-speak').classList.toggle('hidden', !isEn2He);
+  if (isEn2He) speak(currentWord.en);
+
+  const distractors = sample(WORDS, 3, currentWord);
+  const opts = shuffle([currentWord, ...distractors]);
+  // never show the correct answer in the same position twice in a row
+  let pos = opts.indexOf(currentWord);
+  if (pos === lastQuizAnswerPos) {
+    const others = [0, 1, 2, 3].filter(i => i !== pos);
+    const swapWith = others[Math.floor(Math.random() * others.length)];
+    [opts[pos], opts[swapWith]] = [opts[swapWith], opts[pos]];
+    pos = swapWith;
+  }
+  lastQuizAnswerPos = pos;
+  const box = $('quiz-options');
+  box.innerHTML = '';
+  opts.forEach(w => {
+    const b = document.createElement('button');
+    b.className = 'opt' + (isEn2He ? '' : ' ltr');
+    b.textContent = isEn2He ? w.he : w.en;
+    b.onclick = () => answerQuiz(b, w === currentWord);
+    box.appendChild(b);
+  });
+  updateHUD();
+}
+
+function answerQuiz(btn, isCorrect) {
+  if (locked) return;
+  locked = true;
+  const buttons = [...$('quiz-options').children];
+  buttons.forEach(b => b.disabled = true);
+  const correctText = quizDirection === 'en2he' ? currentWord.he : currentWord.en;
+  buttons.forEach(b => { if (b.textContent === correctText) b.classList.add('correct'); });
+  if (!isCorrect) btn.classList.add('wrong');
+  addScore(isCorrect);
+  setTimeout(advance, isCorrect ? 700 : 1500);
+}
+
+/* ================= WRITE (LETTER BANK) ================= */
+let letterBank = [];   // { ch, used }
+let letterSlots = [];  // { ch, bankIdx } | null per position
+let writeLocked = false;
+
+function nextWrite() {
+  currentWord = deck[deckIndex];
+  writeLocked = false;
+  $('write-he').textContent = currentWord.he;
+  $('write-feedback').textContent = '';
+  $('letter-slots').classList.remove('good', 'bad');
+
+  const target = currentWord.en.toLowerCase();
+  const letters = target.split('');
+  const extras = 'abcdefghijklmnopqrstuvwxyz'.split('')
+    .filter(c => !target.includes(c));
+  shuffle(extras).slice(0, Math.min(3, Math.max(2, 10 - letters.length)))
+    .forEach(c => letters.push(c));
+
+  letterBank = shuffle(letters).map(ch => ({ ch, used: false }));
+  letterSlots = target.split('').map(() => null);
+  renderLetterGame();
+  updateHUD();
+}
+
+function renderLetterGame() {
+  const slotsBox = $('letter-slots');
+  slotsBox.innerHTML = '';
+  const target = currentWord.en.toLowerCase();
+  target.split('').forEach((c, i) => {
+    const d = document.createElement('button');
+    if (c === ' ') {
+      d.className = 'slot space-slot';
+      d.textContent = '␣';
+      d.disabled = true;
+    } else {
+      d.className = 'slot' + (letterSlots[i] ? ' filled' : '');
+      d.textContent = letterSlots[i] ? letterSlots[i].ch : '';
+      d.onclick = () => unplaceLetter(i);
+    }
+    slotsBox.appendChild(d);
+  });
+  const bankBox = $('letter-bank');
+  bankBox.innerHTML = '';
+  letterBank.forEach((l, i) => {
+    const b = document.createElement('button');
+    b.className = 'bank-letter';
+    b.textContent = l.ch;
+    b.disabled = l.used || writeLocked;
+    b.onclick = () => placeLetter(i);
+    bankBox.appendChild(b);
+  });
+}
+
+function placeLetter(bankIdx) {
+  if (writeLocked || letterBank[bankIdx].used) return;
+  const target = currentWord.en.toLowerCase();
+  const i = letterSlots.findIndex((s, idx) => target[idx] !== ' ' && !s);
+  if (i === -1) return;
+  letterSlots[i] = { ch: letterBank[bankIdx].ch, bankIdx };
+  letterBank[bankIdx].used = true;
+  renderLetterGame();
+  if (letterSlots.every((s, idx) => target[idx] === ' ' || s)) setTimeout(checkWrite, 250);
+}
+
+function unplaceLetter(slotIdx) {
+  if (writeLocked || !letterSlots[slotIdx]) return;
+  letterBank[letterSlots[slotIdx].bankIdx].used = false;
+  letterSlots[slotIdx] = null;
+  renderLetterGame();
+}
+
+function resetLetters() {
+  if (writeLocked) return;
+  letterBank.forEach(l => l.used = false);
+  letterSlots = letterSlots.map(() => null);
+  renderLetterGame();
+}
+
+function checkWrite() {
+  if (writeLocked) return;
+  const target = currentWord.en.toLowerCase();
+  if (!letterSlots.every((s, idx) => target[idx] === ' ' || s)) {
+    const fb = $('write-feedback');
+    fb.textContent = '⚠️ עוד לא השלמתם את כל האותיות';
+    fb.className = 'feedback bad';
+    return;
+  }
+  const val = letterSlots.map((s, idx) => target[idx] === ' ' ? ' ' : s.ch).join('');
+  const ok = val === target;
+  writeLocked = true;
+  const fb = $('write-feedback');
+  $('letter-slots').classList.add(ok ? 'good' : 'bad');
+  if (ok) {
+    fb.textContent = '✅ נכון מאוד!';
+    fb.className = 'feedback good';
+  } else {
+    fb.textContent = `❌ התשובה הנכונה: ${currentWord.en}`;
+    fb.className = 'feedback bad';
+  }
+  renderLetterGame();
+  addScore(ok);
+  setTimeout(advance, ok ? 800 : 2200);
+}
+
+/* ================= MATCH ================= */
+function startMatchRound() {
+  matchRoundWords = matchPool.splice(0, MATCH_PAIRS);
+  matchSolved = 0;
+  matchSelected = null;
+  renderMatch();
+  updateHUD();
+}
+
+function renderMatch() {
+  const cards = shuffle([
+    ...matchRoundWords.map(w => ({ key: w.en, text: w.en, lang: 'en' })),
+    ...matchRoundWords.map(w => ({ key: w.en, text: w.he.split(',')[0], lang: 'he' }))
+  ]);
+  const grid = $('match-grid');
+  grid.innerHTML = '';
+  cards.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'match-card' + (c.lang === 'en' ? ' en' : '');
+    b.textContent = c.text;
+    b.dataset.key = c.key;
+    b.dataset.lang = c.lang;
+    b.onclick = () => pickMatch(b);
+    grid.appendChild(b);
+  });
+}
+
+function pickMatch(card) {
+  if (card.classList.contains('matched') || card.classList.contains('selected')) return;
+  if (!matchSelected) {
+    matchSelected = card;
+    card.classList.add('selected');
+    if (card.dataset.lang === 'en') speak(card.dataset.key);
+    return;
+  }
+  if (matchSelected === card) return;
+  if (matchSelected.dataset.lang === card.dataset.lang) {
+    matchSelected.classList.remove('selected');
+    matchSelected = card;
+    card.classList.add('selected');
+    return;
+  }
+  const a = matchSelected, b = card;
+  const ok = a.dataset.key === b.dataset.key;
+  currentWord = WORDS.find(w => w.en === a.dataset.key);
+  if (ok) {
+    a.classList.remove('selected'); b.classList.remove('selected');
+    a.classList.add('matched'); b.classList.add('matched');
+    matchSelected = null;
+    matchSolved++;
+    matchSolvedTotal++;
+    deckIndex = matchSolvedTotal;
+    addScore(true);
+    if (matchSolved === matchRoundWords.length) {
+      setTimeout(() => matchPool.length ? startMatchRound() : finishGame(), 600);
+    }
+  } else {
+    b.classList.add('error');
+    a.classList.add('error');
+    addScore(false);
+    setTimeout(() => {
+      a.classList.remove('selected', 'error');
+      b.classList.remove('error');
+      matchSelected = null;
+    }, 500);
+  }
+}
+
+/* ================= SENTENCES ================= */
+function nextSentence() {
+  const s = deck[deckIndex];
+  currentWord = WORDS.find(w => w.en === s.word);
+  locked = false;
+  $('sentence-text').innerHTML = s.en.replace('___', '<u>&nbsp;?&nbsp;</u>');
+  $('sentence-he').textContent = s.he;
+  speak(s.en.replace('___', s.word));
+
+  const distractors = sample(WORDS, 3, currentWord);
+  const opts = shuffle([currentWord, ...distractors]);
+  const box = $('sentence-options');
+  box.innerHTML = '';
+  opts.forEach(w => {
+    const b = document.createElement('button');
+    b.className = 'opt ltr';
+    b.textContent = w.en;
+    b.onclick = () => answerSentence(b, w === currentWord);
+    box.appendChild(b);
+  });
+  updateHUD();
+}
+
+function answerSentence(btn, isCorrect) {
+  if (locked) return;
+  locked = true;
+  const buttons = [...$('sentence-options').children];
+  buttons.forEach(b => b.disabled = true);
+  buttons.forEach(b => { if (b.textContent === currentWord.en) b.classList.add('correct'); });
+  if (!isCorrect) btn.classList.add('wrong');
+  addScore(isCorrect);
+  setTimeout(advance, isCorrect ? 700 : 1500);
+}
+
+/* ================= WORD LIST ================= */
+function renderWordTable() {
+  $('word-tbody').innerHTML = WORDS.map((w, i) =>
+    `<tr><td class="num">${i + 1}</td><td class="en">${w.en}</td><td>${w.he}</td></tr>`).join('');
+}
+
+/* ================= INIT ================= */
+renderBest();
+</script>
+</body>
+</html>
